@@ -1,0 +1,11 @@
+services:
+  springboot:
+    build: .
+    container_name: student-api
+    restart: on-failure
+    ports:
+      - "8500:8500"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://host.docker.internal:3306/students?createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD:
