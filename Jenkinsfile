@@ -1,51 +1,81 @@
 pipeline {
     agent any
+
     tools {
         maven 'maven3'
         jdk 'jdk21'
     }
+
     environment {
-        IMAGE_NAME = "student-api"
-        CONTAINER_NAME = "student-api-container"
+        IMAGE_NAME = 'student-api'
+        // Matches docker-compose.yml service / container
+        COMPOSE_PROJECT_NAME = 'soc'
     }
+
     stages {
         stage('Checkout') {
             steps {
+                // CHANGE only if your fork/URL differs
                 git branch: 'main', url: 'https://github.com/Razaara/student-api.git'
             }
         }
+
         stage('Build with Maven') {
             steps {
+                // Compile/package on the Jenkins agent (exam-visible Maven stage)
                 bat 'mvn clean package -DskipTests'
             }
         }
-        stage('Build Docker Image') {
+
+        stage('Deploy with Docker Compose') {
             steps {
-                bat 'docker build -t %IMAGE_NAME% .'
+                // Full stack: MySQL (healthy) + Spring Boot on port 8500
+                // Uses service hostname "mysql" inside the compose network
+                bat 'docker compose down'
+                bat 'docker compose up -d --build'
             }
         }
-        stage('Stop Old Container') {
+
+        stage('Verify Deployment') {
             steps {
-                bat 'docker stop %CONTAINER_NAME% || exit 0'
-            }
-        }
-        stage('Remove Old Container') {
-            steps {
-                bat 'docker rm %CONTAINER_NAME% || exit 0'
-            }
-        }
-        stage('Run New Container') {
-            steps {
-                bat 'docker run -d -p 8500:8500 --name %CONTAINER_NAME% %IMAGE_NAME%'
+                bat 'docker compose ps'
+                bat 'docker compose logs --tail 40 springboot'
+                // Retry until Spring Boot answers on :8500 (up to ~90s)
+                bat '''
+                    setlocal EnableDelayedExpansion
+                    set OK=0
+                    for /L %%i in (1,1,18) do (
+                      curl.exe -f -s -o NUL http://localhost:8500/api/students
+                      if !ERRORLEVEL! EQU 0 (
+                        echo API is UP
+                        set OK=1
+                        goto :done
+                      )
+                      echo Waiting for API... attempt %%i
+                      ping -n 6 127.0.0.1 >NUL
+                    )
+                    :done
+                    if !OK! NEQ 1 (
+                      echo API did not become ready
+                      docker compose logs --tail 120 springboot
+                      exit /b 1
+                    )
+                    curl.exe -s -w "HTTP %%{http_code}" http://localhost:8500/api/students
+                    echo.
+                '''
             }
         }
     }
+
     post {
         success {
-            echo 'Deployment successful.'
+            echo 'Deployment successful. API: http://localhost:8500/api/students'
         }
         failure {
-            echo 'Pipeline failed — check console output.'
+            echo 'Pipeline failed — check console output / Docker logs.'
+            bat 'docker compose ps || exit /b 0'
+            bat 'docker compose logs --tail 120 springboot || exit /b 0'
+            bat 'docker compose logs --tail 80 mysql || exit /b 0'
         }
     }
 }

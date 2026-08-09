@@ -71,4 +71,11 @@ docker push razzara/student-api:latest
 
 ## Jenkins
 
-See `Jenkinsfile` for a Declarative pipeline (Checkout → Maven → Docker build/run).
+Declarative `Jenkinsfile` stages:
+
+1. Checkout — `https://github.com/Razaara/student-api.git`
+2. Build with Maven — `mvn clean package -DskipTests`
+3. Deploy with Docker Compose — MySQL + Spring Boot (`8500`)
+4. Verify — retries `GET /api/students` until healthy
+
+**Jenkins setup:** Tools named `maven3` and `jdk21`, Docker available to the agent, job type **Pipeline** → Pipeline script from SCM (this repo) **or** paste the `Jenkinsfile`.

@@ -247,17 +247,18 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 
 ---
 
-## 7. Jenkinsfile notes
+## 7. Jenkinsfile notes (corrected)
 
-Declarative pipeline stages:
+**Problem with the old pipeline:** `docker run` alone started Spring Boot with no MySQL on the compose network, so JDBC to `localhost` failed inside the container.
+
+**Correct pipeline stages:**
 
 1. Checkout (`https://github.com/Razaara/student-api.git`)
-2. Maven package
-3. Docker build
-4. Stop/remove old container (`|| exit 0` for Windows)
-5. Run new container on `8500:8500`
+2. Maven package (`mvn clean package -DskipTests`)
+3. Deploy with Docker Compose (`docker compose up -d --build`) — MySQL + API together
+4. Verify — retries `GET http://localhost:8500/api/students` until UP
 
-Requires Jenkins tools named `maven3` and `jdk21`.
+Requires Jenkins tools named `maven3` and `jdk21`, and Docker on the agent.
 
 ---
 
