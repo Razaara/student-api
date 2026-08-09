@@ -489,24 +489,110 @@ POST (201) → GET all (200) → GET by id (200) → PUT (200) → DELETE (204)
 
 ## STEP 09 — Git commit + push to GitHub
 
+There are **two ways** to get code onto GitHub. Use the one that matches your exam situation.
+
+### Option A — Create project on Desktop first (NO clone), then push
+
+Use this when you create a folder on Desktop, build the microservice there, then upload to GitHub.
+
+**A1. Go to your project folder**
+
+```bash
+cd C:\Users\rasar\OneDrive\Desktop\YOUR_FOLDER_NAME
+```
+
+Example (this project):
+
 ```bash
 cd C:\Users\rasar\OneDrive\Desktop\SOC
+```
+
+> After clone/create, `SOC` **is** the student-api project root. There is no extra inner `student-api` folder unless you created one yourself.
+
+**A2. Initialize Git (first time only)**
+
+```bash
 git init
-git add .
-git commit -m "Initial commit: Student CRUD API"
 git branch -M main
+```
+
+**A3. Make sure `.gitignore` exists**
+
+```text
+target/
+.idea/
+*.class
+.env
+*.log
+```
+
+**A4. Create empty repo on GitHub**
+
+1. Open https://github.com → login (**Razaara**)
+2. **New repository**
+3. Name: e.g. `student-api`
+4. Keep it **empty** (do not add README if code already exists locally)
+5. Create repository
+6. Copy URL, example:
+```text
+https://github.com/Razaara/student-api.git
+```
+
+**A5. Connect local folder to GitHub**
+
+```bash
 git remote add origin https://github.com/Razaara/student-api.git
+```
+
+If remote already exists / wrong URL:
+
+```bash
+git remote set-url origin https://github.com/Razaara/student-api.git
+```
+
+Check:
+
+```bash
+git remote -v
+```
+
+**A6. First push**
+
+```bash
+git add .
+git commit -m "Initial commit: Student microservice"
 git push -u origin main
 ```
 
-Everyday:
+---
+
+### Option B — Clone existing GitHub repo first, then work
+
+Use this when the repo already exists on GitHub and you want a local copy.
 
 ```bash
+cd C:\Users\rasar\OneDrive\Desktop
+git clone https://github.com/Razaara/student-api.git SOC
+cd SOC
+```
+
+Then edit files inside `SOC` and push updates (see “Everyday push” below).
+
+---
+
+### Everyday push (after you add/edit files)
+
+Works for both Option A and Option B:
+
+```bash
+cd C:\Users\rasar\OneDrive\Desktop\SOC
 git status
 git add .
-git commit -m "Add update endpoint"
-git push
+git commit -m "Update project"
+git push origin main
 ```
+
+---
 
 ### Shared lab PC (before push)
 
@@ -520,7 +606,8 @@ git remote -v
 git push -u origin main
 ```
 
-Login with **your** GitHub account when prompted.
+Login with **your** GitHub account when prompted.  
+(`user.name` / `user.email` do **not** authenticate you.)
 
 **This project repo:** https://github.com/Razaara/student-api
 
@@ -1078,10 +1165,14 @@ mvn spring-boot:run
 
 # STEP 08 — Postman: POST → GET → GET id → PUT → DELETE
 
-# STEP 09
+# STEP 09 — if created locally first (no clone):
+# git init → git branch -M main → create empty GitHub repo →
+# git remote add origin <your-repo-url> → git add . → commit → push -u origin main
+#
+# Everyday push after adding files:
 git add .
 git commit -m "Student CRUD API"
-git push -u origin main
+git push origin main
 
 # STEP 10–11
 docker build -t student-api .
