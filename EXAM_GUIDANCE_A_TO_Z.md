@@ -2,7 +2,8 @@
 
 **Spring Boot · Postman · Git · Docker · Jenkins**
 
-> Print this before the practical exam. Every code block and command below matches the **working** project.
+> Print this before the exam. Follow **Part A** in order (Start → End).  
+> If something breaks, go to **Part C — Problems and Fixing** at the end.
 
 | Item | Value |
 |---|---|
@@ -18,54 +19,66 @@
 
 ---
 
-## Table of Contents
+## How this book is organized
 
-1. [Exam workflow (do this order)](#1-exam-workflow-do-this-order)
-2. [Project structure](#2-project-structure)
-3. [Create Spring Boot project](#3-create-spring-boot-project)
-4. [pom.xml](#4-pomxml)
-5. [application.properties](#5-applicationproperties)
-6. [Entity — Student.java](#6-entity--studentjava)
-7. [Repository](#7-repository)
-8. [Service layer](#8-service-layer)
-9. [Controller](#9-controller)
-10. [Main class](#10-main-class)
-11. [Run locally + MySQL](#11-run-locally--mysql)
-12. [Postman testing](#12-postman-testing)
-13. [Git + GitHub](#13-git--github)
-14. [Dockerfile](#14-dockerfile)
-15. [docker-compose.yml](#15-docker-composeyml)
-16. [Docker Hub push](#16-docker-hub-push)
-17. [Jenkins pipeline](#17-jenkins-pipeline)
-18. [Annotations cheat sheet](#18-annotations-cheat-sheet)
-19. [Common errors and fixes](#19-common-errors-and-fixes)
-20. [Common Git issues](#20-common-git-issues)
-21. [Ports already in use — how to fix](#21-ports-already-in-use--how-to-fix)
-22. [One-page final checklist](#22-one-page-final-checklist)
+| Part | What it is |
+|---|---|
+| **Part A** | Project steps **Start → End** (do in this exact order) |
+| **Part B** | Quick reference (annotations) |
+| **Part C** | **Problems and Fixing** (Git, ports, Spring, Docker, Jenkins) |
+| **Part D** | One-page final checklist |
 
 ---
 
-## 1. Exam workflow (do this order)
+# PART A — Project Steps (Start → End)
+
+Do these steps in order. Do not skip ahead unless the examiner asks.
 
 ```
-1. Create Spring Boot project (Web, JPA, MySQL, Lombok, Validation)
-2. Write application.properties (port 8500)
-3. Create Entity → Repository → Service → Controller
-4. Start MySQL
-5. Run: mvn spring-boot:run
-6. Test 5 endpoints in Postman
-7. git add / commit / push to GitHub
-8. docker build + docker run  (or docker compose up)
-9. Push image to Docker Hub
-10. Create Jenkins Pipeline job → Build Now
-11. Re-test API in Postman
+STEP 01  Create Spring Boot project
+STEP 02  Project structure + .gitignore
+STEP 03  pom.xml dependencies
+STEP 04  application.properties
+STEP 05  Main class
+STEP 06  Entity → Repository → Service → Controller
+STEP 07  Start MySQL + run the app
+STEP 08  Test with Postman (all 5 endpoints)
+STEP 09  Git commit + push to GitHub
+STEP 10  Docker (Dockerfile / compose)
+STEP 11  Push image to Docker Hub
+STEP 12  Jenkins Pipeline → Build Now → re-test
 ```
 
-**If time is short:** CRUD + Postman first → Git push → Docker → Jenkins last.
+**If time is short:** Steps 01–08 first → 09 Git → 10 Docker → 12 Jenkins last.
 
 ---
 
-## 2. Project structure
+## STEP 01 — Create Spring Boot project
+
+1. Open https://start.spring.io **or** IntelliJ → New → Spring Initializr
+2. Project: **Maven** · Language: **Java** · Java: **21**
+3. Group: `com.example` · Artifact: `studentapi` · Package: `com.example.studentapi`
+4. Add dependencies:
+   - Spring Web
+   - Spring Data JPA
+   - MySQL Driver
+   - Lombok
+   - Validation
+5. Generate and extract into `C:\Users\rasar\OneDrive\Desktop\SOC`
+
+> If Initializr only offers Boot 4.x, use Boot **3.4.x** if available, or keep parent version `3.4.5` as in this handbook.
+
+**Already have the working repo?**
+
+```bash
+cd C:\Users\rasar\OneDrive\Desktop
+git clone https://github.com/Razaara/student-api.git SOC
+cd SOC
+```
+
+---
+
+## STEP 02 — Project structure + .gitignore
 
 ```
 SOC/
@@ -74,7 +87,6 @@ SOC/
 ├── docker-compose.yml
 ├── Jenkinsfile
 ├── .gitignore
-├── README.md
 └── src/main/
     ├── java/com/example/studentapi/
     │   ├── StudentApiApplication.java
@@ -86,38 +98,20 @@ SOC/
     └── resources/application.properties
 ```
 
----
+**`.gitignore`**
 
-## 3. Create Spring Boot project
-
-### Option A — Spring Initializr (IDE)
-
-1. https://start.spring.io **or** IntelliJ → New → Spring Initializr
-2. Project: **Maven** · Language: **Java** · Java: **21**
-3. Group: `com.example` · Artifact: `studentapi` · Package: `com.example.studentapi`
-4. Dependencies:
-   - Spring Web
-   - Spring Data JPA
-   - MySQL Driver
-   - Lombok
-   - Validation
-5. Generate → extract into `Desktop\SOC`
-
-> **Note:** If Initializr only offers Spring Boot 4.x, choose Boot **3.4.x** if available, or create `pom.xml` manually with parent version `3.4.5` (this project).
-
-### Option B — Use this ready repo
-
-```bash
-cd C:\Users\rasar\OneDrive\Desktop
-git clone https://github.com/Razaara/student-api.git SOC
-cd SOC
+```
+target/
+.idea/
+*.iml
+*.class
+.env
+*.log
 ```
 
 ---
 
-## 4. pom.xml
-
-Full working `pom.xml`:
+## STEP 03 — pom.xml
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -192,11 +186,9 @@ Full working `pom.xml`:
 </project>
 ```
 
-> Spring Boot 3 uses `com.mysql:mysql-connector-j` (not old `mysql:mysql-connector-java`).
-
 ---
 
-## 5. application.properties
+## STEP 04 — application.properties
 
 **File:** `src/main/resources/application.properties`
 
@@ -210,18 +202,43 @@ spring.jpa.hibernate.ddl-auto=update
 server.port=8500
 ```
 
-| Property | Why |
+| Setting | Meaning |
 |---|---|
 | `createDatabaseIfNotExist=true` | Creates DB if missing |
-| `ddl-auto=update` | Auto-creates/updates tables from entity |
-| `server.port=8500` | App listens on 8500 (not 8080) |
-| password `root` | Matches Docker MySQL `MYSQL_ROOT_PASSWORD` |
+| `ddl-auto=update` | Creates/updates tables from entity |
+| `server.port=8500` | API port (not 8080) |
+| password `root` | Matches Docker MySQL |
 
 ---
 
-## 6. Entity — Student.java
+## STEP 05 — Main class
 
-**File:** `src/main/java/com/example/studentapi/entity/Student.java`
+**File:** `StudentApiApplication.java`
+
+```java
+package com.example.studentapi;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class StudentApiApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(StudentApiApplication.class, args);
+    }
+}
+```
+
+All other classes must stay under package `com.example.studentapi...` for component scanning.
+
+---
+
+## STEP 06 — Entity → Repository → Service → Controller
+
+Create in this order.
+
+### 6.1 Entity — Student.java
 
 ```java
 package com.example.studentapi.entity;
@@ -248,15 +265,9 @@ public class Student {
 }
 ```
 
-> **Must use** `jakarta.persistence` in Spring Boot 3 (not `javax.persistence`).  
-> `@Data` already includes getters/setters — no need for extra `@Getter`/`@Setter`.  
-> `id` is a String (e.g. `AS2023000`) — send it in the POST body.
+> Use `jakarta.persistence` (Boot 3). Send `id` in POST body (e.g. `AS2023000`).
 
----
-
-## 7. Repository
-
-**File:** `src/main/java/com/example/studentapi/repository/StudentRepository.java`
+### 6.2 Repository — StudentRepository.java
 
 ```java
 package com.example.studentapi.repository;
@@ -268,13 +279,7 @@ public interface StudentRepository extends JpaRepository<Student, String> {
 }
 ```
 
-`JpaRepository<Student, String>` → entity type + primary key type.
-
----
-
-## 8. Service layer
-
-### StudentService.java (interface)
+### 6.3 Service interface — StudentService.java
 
 ```java
 package com.example.studentapi.service;
@@ -291,7 +296,7 @@ public interface StudentService {
 }
 ```
 
-### StudentServiceImpl.java
+### 6.4 Service impl — StudentServiceImpl.java
 
 ```java
 package com.example.studentapi.service;
@@ -340,13 +345,7 @@ public class StudentServiceImpl implements StudentService {
 }
 ```
 
-> Missing id throws `RuntimeException` → HTTP **500** unless you add exception handling.
-
----
-
-## 9. Controller
-
-**File:** `src/main/java/com/example/studentapi/controller/StudentController.java`
+### 6.5 Controller — StudentController.java
 
 ```java
 package com.example.studentapi.controller;
@@ -395,42 +394,21 @@ public class StudentController {
 }
 ```
 
-### Endpoint summary
+### Endpoints (remember these)
 
 | Method | Path | Success |
 |---|---|---|
-| POST | `/api/students` | **201** Created |
-| GET | `/api/students` | **200** OK |
-| GET | `/api/students/{id}` | **200** OK |
-| PUT | `/api/students/{id}` | **200** OK |
-| DELETE | `/api/students/{id}` | **204** No Content |
+| POST | `/api/students` | **201** |
+| GET | `/api/students` | **200** |
+| GET | `/api/students/{id}` | **200** |
+| PUT | `/api/students/{id}` | **200** |
+| DELETE | `/api/students/{id}` | **204** |
 
 ---
 
-## 10. Main class
+## STEP 07 — Start MySQL + run the app
 
-```java
-package com.example.studentapi;
-
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-
-@SpringBootApplication
-public class StudentApiApplication {
-
-    public static void main(String[] args) {
-        SpringApplication.run(StudentApiApplication.class, args);
-    }
-}
-```
-
-Package of controllers/services must be **under** `com.example.studentapi` for component scan.
-
----
-
-## 11. Run locally + MySQL
-
-### Start MySQL with Docker (recommended)
+### 7.1 Start MySQL (Docker)
 
 ```bash
 cd C:\Users\rasar\OneDrive\Desktop\SOC
@@ -440,14 +418,7 @@ docker ps
 
 Wait until `student-mysql` is **healthy**.
 
-### Or use local MySQL
-
-```sql
-CREATE DATABASE students;
--- user root / password root (match application.properties)
-```
-
-### Run the app
+### 7.2 Run Spring Boot
 
 ```bash
 mvn clean package -DskipTests
@@ -461,16 +432,18 @@ Tomcat started on port(s): 8500
 Started StudentApiApplication
 ```
 
+> Port busy? Jump to **Part C → Ports**.
+
 ---
 
-## 12. Postman testing
+## STEP 08 — Test with Postman
 
 Base URL: `http://localhost:8500/api/students`  
-Body type: **raw → JSON**
+Body: **raw → JSON**
 
-### 12.1 POST — Create
+### 8.1 POST — Create (201)
 
-**POST** `http://localhost:8500/api/students`
+`POST http://localhost:8500/api/students`
 
 ```json
 {
@@ -481,21 +454,17 @@ Body type: **raw → JSON**
 }
 ```
 
-Expect: **201** + same JSON back.
+### 8.2 GET — All (200)
 
-### 12.2 GET — All
+`GET http://localhost:8500/api/students`
 
-**GET** `http://localhost:8500/api/students`  
-Expect: **200** + JSON array.
+### 8.3 GET — By id (200)
 
-### 12.3 GET — By id
+`GET http://localhost:8500/api/students/AS2023000`
 
-**GET** `http://localhost:8500/api/students/AS2023000`  
-Expect: **200** + one student.
+### 8.4 PUT — Update (200)
 
-### 12.4 PUT — Update
-
-**PUT** `http://localhost:8500/api/students/AS2023000`
+`PUT http://localhost:8500/api/students/AS2023000`
 
 ```json
 {
@@ -505,42 +474,19 @@ Expect: **200** + one student.
 }
 ```
 
-Expect: **200**, `"id": "AS2023000"` unchanged.
+### 8.5 DELETE (204)
 
-### 12.5 DELETE
+`DELETE http://localhost:8500/api/students/AS2023000`
 
-**DELETE** `http://localhost:8500/api/students/AS2023000`  
-Expect: **204** (empty body).
+### Test order
 
-### HTTP codes
-
-| Code | Meaning |
-|---|---|
-| 200 | OK (GET/PUT) |
-| 201 | Created (POST) |
-| 204 | No Content (DELETE) |
-| 400 | Bad JSON / bad request |
-| 404 | Wrong URL / not mapped |
-| 500 | Server error (e.g. missing id → RuntimeException) |
+```
+POST (201) → GET all (200) → GET by id (200) → PUT (200) → DELETE (204)
+```
 
 ---
 
-## 13. Git + GitHub
-
-> Common Git errors (auth, rejected push, wrong remote, shared PC): see **[§20 Common Git issues](#20-common-git-issues)**.
-
-### .gitignore
-
-```
-target/
-.idea/
-*.iml
-*.class
-.env
-*.log
-```
-
-### First push
+## STEP 09 — Git commit + push to GitHub
 
 ```bash
 cd C:\Users\rasar\OneDrive\Desktop\SOC
@@ -552,7 +498,7 @@ git remote add origin https://github.com/Razaara/student-api.git
 git push -u origin main
 ```
 
-### Everyday
+Everyday:
 
 ```bash
 git status
@@ -561,11 +507,10 @@ git commit -m "Add update endpoint"
 git push
 ```
 
-### Shared lab PC — clear old GitHub login
+### Shared lab PC (before push)
 
-1. Windows → **Credential Manager** → **Windows Credentials**
-2. Remove `github.com` / `git:https://github.com`
-3. Then:
+1. Credential Manager → Windows Credentials → remove `github.com`
+2. Then:
 
 ```bash
 git config user.name "Your Name"
@@ -574,28 +519,25 @@ git remote -v
 git push -u origin main
 ```
 
-Login with **your** GitHub account when prompted.  
-(`user.name` / `user.email` do **not** log you into GitHub.)
+Login with **your** GitHub account when prompted.
 
-### This project’s repo
+**This project repo:** https://github.com/Razaara/student-api
 
-https://github.com/Razaara/student-api
+> Git errors? Jump to **Part C → Git**.
 
 ---
 
-## 14. Dockerfile
+## STEP 10 — Docker
 
-**File:** `Dockerfile` (project root)
+### 10.1 Dockerfile
 
 ```dockerfile
-# --- Stage 1: Build the application with Maven ---
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /app
 COPY pom.xml .
 COPY src ./src
 RUN mvn -B clean package -DskipTests
 
-# --- Stage 2: Run the packaged jar on a lightweight JRE ---
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
@@ -603,7 +545,7 @@ EXPOSE 8500
 ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
 
-### Build & run (API only — MySQL must already be running)
+### 10.2 Build & run one container (MySQL already running)
 
 ```bash
 docker build -t student-api .
@@ -614,32 +556,9 @@ docker run -d -p 8500:8500 --name student-api-container ^
   student-api
 
 docker logs -f student-api-container
-docker stop student-api-container
-docker rm student-api-container
 ```
 
-> Inside a container, `localhost` is **not** your PC. Use `host.docker.internal` (Docker Desktop) or the Compose service name `mysql`.
-
-### Useful Docker commands
-
-```bash
-docker images
-docker ps
-docker ps -a
-docker stop <id>
-docker rm <id>
-docker rmi <image>
-docker logs <id>
-docker login
-docker tag student-api razzara/student-api
-docker push razzara/student-api
-```
-
----
-
-## 15. docker-compose.yml
-
-**File:** `docker-compose.yml`
+### 10.3 docker-compose.yml (MySQL + API together)
 
 ```yaml
 services:
@@ -679,8 +598,6 @@ volumes:
   mysql_data:
 ```
 
-### Compose commands
-
 ```bash
 docker compose up -d --build
 docker compose ps
@@ -688,13 +605,13 @@ docker compose logs -f springboot
 docker compose down
 ```
 
-> In Compose, DB host is service name **`mysql`**, not `localhost`.
+> Compose DB host = service name **`mysql`**. Single `docker run` DB host = **`host.docker.internal`**.
 
 ---
 
-## 16. Docker Hub push
+## STEP 11 — Push image to Docker Hub
 
-Docker username: **`razzara`**
+Docker user: **`razzara`**
 
 ```bash
 docker login
@@ -702,52 +619,52 @@ docker tag student-api:latest razzara/student-api:latest
 docker push razzara/student-api:latest
 ```
 
-Pull later:
-
 ```bash
 docker pull razzara/student-api:latest
 ```
 
 ---
 
-## 17. Jenkins pipeline
+## STEP 12 — Jenkins Pipeline
 
-### 17.1 Jenkins tools (one-time)
+### 12.1 One-time tools
 
 **Manage Jenkins → Tools**
 
-- Maven installation **Name:** `Maven` (must match Jenkinsfile)
-- JDK: system Java 21 is fine on this machine
+- Maven name must be exactly: **`Maven`**
+- Java 21 on the machine
+- Docker Desktop running
 
-Docker must be available to the Jenkins agent (Docker Desktop running).
+### 12.2 Create job
 
-### 17.2 Create Pipeline job
+1. http://localhost:8080 → Login
+2. **New Item** → `student-api` → **Pipeline**
+3. Pipeline script from SCM → Git
+4. URL: `https://github.com/Razaara/student-api.git`
+5. Branch: `*/main` · Script Path: `Jenkinsfile`
+6. Save → **Build Now**
 
-1. Open http://localhost:8080
-2. Login
-3. **New Item** → name: `student-api` → **Pipeline** → OK
-4. Pipeline → **Pipeline script from SCM**
-5. SCM: **Git**
-6. Repository URL: `https://github.com/Razaara/student-api.git`
-7. Branch: `*/main`
-8. Script Path: `Jenkinsfile`
-9. Save → **Build Now**
+### 12.3 Before Build Now
 
-### 17.3 Working Jenkinsfile
+```bash
+docker compose up -d mysql
+docker stop student-api student-api-container 2>NUL
+docker rm student-api student-api-container 2>NUL
+```
+
+### 12.4 Jenkinsfile (working)
 
 ```groovy
 pipeline {
     agent any
 
     tools {
-        // Must match Manage Jenkins → Tools → Maven installations → Name
         maven 'Maven'
     }
 
     environment {
         IMAGE_NAME = 'student-api'
         CONTAINER_NAME = 'student-api-container'
-        // Host MySQL from docker-compose service student-mysql on port 3306
         DB_URL = 'jdbc:mysql://host.docker.internal:3306/students?createDatabaseIfNotExist=true'
         DB_USER = 'root'
         DB_PASS = 'root'
@@ -838,325 +755,294 @@ pipeline {
 }
 ```
 
-### Pipeline stages (what examiner sees)
+### Pipeline stages (examiner view)
 
 ```
-Checkout → Build with Maven → Build Docker Image →
-Stop Old Container → Remove Old Container → Run New Container → Verify
+Checkout → Maven → Docker Build → Stop → Remove → Run → Verify
 ```
 
-### Before Build Now
+### 12.5 After SUCCESS — re-test in Postman
 
-```bash
-# MySQL must be up; free port 8500 if something else uses it
-docker compose up -d mysql
-docker stop student-api 2>NUL
-docker stop student-api-container 2>NUL
-```
-
-Verified: Jenkins job `student-api` build **#1 SUCCESS**.
+Open `http://localhost:8500/api/students` and run POST/GET again.
 
 ---
 
-## 18. Annotations cheat sheet
+# PART B — Quick Reference (Annotations)
 
 | Annotation | Use |
 |---|---|
-| `@SpringBootApplication` | Main class — auto-config + component scan |
-| `@RestController` | REST controller (`@Controller` + `@ResponseBody`) |
-| `@RequestMapping` | Base path, e.g. `/api/students` |
+| `@SpringBootApplication` | Main class |
+| `@RestController` | REST controller |
+| `@RequestMapping` | Base path `/api/students` |
 | `@PostMapping` / `@GetMapping` / `@PutMapping` / `@DeleteMapping` | HTTP methods |
-| `@PathVariable` | Bind `{id}` from URL |
-| `@RequestBody` | Bind JSON body to Java object |
+| `@PathVariable` | `{id}` from URL |
+| `@RequestBody` | JSON → Java object |
 | `@Service` | Service bean |
 | `@Entity` / `@Id` / `@Table` | JPA entity |
-| `@Data` | Lombok getters/setters/toString/equals |
-| `@RequiredArgsConstructor` | Constructor injection for `final` fields |
+| `@Data` | Lombok getters/setters |
+| `@RequiredArgsConstructor` | Constructor injection |
 
 ---
 
-## 19. Common errors and fixes
+# PART C — Problems and Fixing (FINAL)
 
-| Error | Fix |
+Use this part only when something fails. Find your error → apply the fix → return to Part A.
+
+---
+
+## C1. Quick problem index
+
+| Area | Go to |
 |---|---|
-| Port 8500 / 3306 / 8080 already in use | See [§21](#21-ports-already-in-use--how-to-fix) |
-| Communications link failure | Start MySQL: `docker compose up -d mysql` |
-| Access denied for user root | Password must be `root` (match Compose) |
-| Unknown database | Use `createDatabaseIfNotExist=true` |
-| Whitelabel 404 | Check URL path + `@RequestMapping` |
-| `javax.persistence` not found | Change to `jakarta.persistence` |
-| Lombok getters missing in IDE | Install Lombok plugin + enable annotation processing |
-| Docker push denied | `docker login` + tag as `razzara/student-api` |
-| Jenkins `mvn` not found | Tools name must be exactly `Maven` |
-| Jenkins container can’t reach DB | Use `host.docker.internal` (as in Jenkinsfile) |
-| Git problems | See [§20](#20-common-git-issues) |
-| POST 400 in PowerShell curl | JSON escaping broken — use Postman instead |
+| Spring Boot / MySQL / Postman | **C2** |
+| Git / GitHub | **C3** |
+| Port already in use (8500 / 3306 / 8080) | **C4** |
+| Docker / Docker Hub | **C5** |
+| Jenkins | **C6** |
 
 ---
 
-## 20. Common Git issues
+## C2. Spring Boot / MySQL / Postman problems
 
-Use these during the exam when `git push` / commit fails.
+| Problem | Fix |
+|---|---|
+| Communications link failure | `docker compose up -d mysql` — wait until healthy |
+| Access denied for user 'root' | Set password to `root` in `application.properties` |
+| Unknown database | Keep `createDatabaseIfNotExist=true` |
+| Table doesn’t exist | Keep `spring.jpa.hibernate.ddl-auto=update` |
+| Whitelabel 404 | Check URL = `/api/students` and controller mapping |
+| 400 Bad Request on POST | Valid JSON + include `"id"` field; use Postman raw JSON |
+| 500 on GET missing id | Expected with sample code (`RuntimeException`) |
+| `javax.persistence` errors | Change imports to `jakarta.persistence` |
+| Lombok getters not found | Install Lombok plugin + enable annotation processing |
+| App starts but Postman ECONNREFUSED | Confirm console: `Tomcat started on port(s): 8500` |
 
-| Issue / Error | Cause | Fix |
+---
+
+## C3. Common Git issues
+
+| Problem | Cause | Fix |
 |---|---|---|
-| `fatal: not a git repository` | Wrong folder or never ran `git init` | `cd` into project folder, then `git init` |
-| `fatal: remote origin already exists` | You already added origin | `git remote set-url origin https://github.com/Razaara/student-api.git` |
-| `Updates were rejected` / non-fast-forward | Remote has commits you don’t have | `git pull origin main` (or `git pull --rebase`) then `git push` |
-| `Authentication failed` / `Password authentication is not supported` | GitHub blocks account password for HTTPS | Use Personal Access Token (PAT) as password, or sign in via Git Credential Manager |
-| Wrong GitHub account on shared PC | Old credentials stored in Windows | Credential Manager → Windows Credentials → remove `github.com` → push again and login |
-| `Permission denied (publickey)` | SSH key not set up | Switch remote to HTTPS: `git remote set-url origin https://github.com/YOUR_USER/YOUR_REPO.git` |
-| `Everything up-to-date` but files missing on GitHub | Forgot to commit | `git status` → `git add .` → `git commit -m "msg"` → `git push` |
-| Accidentally committed `target/` | Build folder should be ignored | Add `target/` to `.gitignore`, then `git rm -r --cached target/` → commit → push |
-| Merge conflict (`<<<<<<<`) | Same lines changed in two commits | Edit file, remove markers, keep correct code → `git add .` → `git commit` |
-| `fatal: refusing to merge unrelated histories` | New local repo + existing GitHub repo | `git pull origin main --allow-unrelated-histories` then resolve / push |
-| Wrong commit message (not pushed yet) | Typo in last commit | `git commit --amend -m "correct message"` |
-| Detached HEAD | Checked out a commit hash, not a branch | `git checkout main` |
-| `Please tell me who you are` | Git identity not set | `git config user.name "Your Name"` and `git config user.email "you@email.com"` |
+| `fatal: not a git repository` | Wrong folder / no init | `cd` project → `git init` |
+| `remote origin already exists` | Origin already added | `git remote set-url origin https://github.com/Razaara/student-api.git` |
+| Updates rejected (non-fast-forward) | Remote ahead of local | `git pull origin main` then `git push` |
+| Authentication failed | GitHub blocks password | Use PAT / Git Credential Manager login |
+| Wrong GitHub account (lab PC) | Old Windows credentials | Credential Manager → remove `github.com` → push → login again |
+| `Permission denied (publickey)` | SSH not set up | Use HTTPS remote URL |
+| Everything up-to-date but GitHub empty | Forgot commit | `git add .` → `git commit -m "msg"` → `git push` |
+| Committed `target/` | Missing `.gitignore` | Add `target/` → `git rm -r --cached target/` → commit → push |
+| Merge conflict `<<<<<<<` | Same lines edited twice | Edit file → remove markers → `git add .` → `git commit` |
+| Unrelated histories | New local + existing remote | `git pull origin main --allow-unrelated-histories` |
+| `Please tell me who you are` | Identity missing | `git config user.name "..."` and `user.email "..."` |
+| Detached HEAD | Checked out a commit | `git checkout main` |
 
-### Quick Git recovery commands
+### Git recovery commands
 
 ```bash
-# See what is wrong
 git status
 git remote -v
 git log --oneline -5
 
-# Fix wrong remote URL
 git remote set-url origin https://github.com/Razaara/student-api.git
-
-# Pull then push (rejected updates)
 git pull origin main
 git push origin main
 
-# Remove tracked target/ after adding .gitignore
 git rm -r --cached target/
 git add .
 git commit -m "Stop tracking target folder"
 git push
-
-# Clear old GitHub credential (Windows)
-# Search: Credential Manager → Windows Credentials → Remove github.com entries
-# Then:
-git push
-# Login popup → use YOUR GitHub account / PAT
 ```
 
-### Shared university PC checklist
+### Shared PC Git checklist
 
 ```
-1. Credential Manager → remove old github.com credentials
+1. Credential Manager → remove github.com
 2. git config user.name "Your Name"
 3. git config user.email "your-email@example.com"
-4. git remote -v   (must be YOUR repo)
-5. git add . → git commit -m "..." → git push
-6. Login with YOUR GitHub account when prompted
+4. git remote -v  (must be YOUR repo)
+5. git add . → commit → push
+6. Login with YOUR GitHub account
 ```
 
-> `git config user.name` / `user.email` only set the **author name on commits**. They do **not** authenticate you. Authentication = GitHub login / PAT / Credential Manager.
+> `user.name` / `user.email` do **not** log you into GitHub. Login/PAT does.
 
 ---
 
-## 21. Ports already in use — how to fix
-
-This project / tools commonly use:
+## C4. Ports already in use — how to fix
 
 | Port | Used by |
 |---|---|
-| **8500** | Spring Boot Student API |
+| **8500** | Spring Boot API |
 | **3306** | MySQL |
 | **8080** | Jenkins |
 
 ### Symptoms
 
-- Spring Boot: `Port 8500 was already in use`
-- Docker: `Bind for 0.0.0.0:8500 failed: port is already allocated`
-- Jenkins / browser: wrong app opens, or service won’t start
+- `Port 8500 was already in use`
+- `Bind for 0.0.0.0:8500 failed: port is already allocated`
 
-### Step 1 — See what is using the port (Windows)
-
-**PowerShell:**
+### Find what uses the port
 
 ```powershell
-# Replace 8500 with 3306 or 8080 as needed
 netstat -ano | findstr :8500
 ```
 
-Last column = **PID** (process id).
+Last column = **PID**.
 
-**Or:**
-
-```powershell
-Get-NetTCPConnection -LocalPort 8500 -ErrorAction SilentlyContinue |
-  Select-Object LocalPort,OwningProcess,State
-```
-
-### Step 2A — Stop Docker containers (most common in this exam)
+### Fix A — Stop Docker containers (most common)
 
 ```bash
 docker ps
-docker stop student-api
-docker stop student-api-container
-docker rm student-api
-docker rm student-api-container
-
-# If MySQL port 3306 is stuck on an old container:
-docker stop student-mysql
-docker rm student-mysql
-
-# Or stop everything from this project:
+docker stop student-api student-api-container student-mysql 2>NUL
+docker rm student-api student-api-container student-mysql 2>NUL
 cd C:\Users\rasar\OneDrive\Desktop\SOC
 docker compose down
 ```
 
-Then start only what you need:
+Then restart what you need:
 
 ```bash
 docker compose up -d mysql
-# later run app with mvn OR full compose / Jenkins
 ```
 
-### Step 2B — Kill a normal Windows process (Java / old Spring Boot)
+### Fix B — Kill Java / local process
 
 ```powershell
-# Find PID for port 8500
 netstat -ano | findstr :8500
-
-# Kill that PID (example: 12345)
-taskkill /PID 12345 /F
+taskkill /PID <PID> /F
 ```
 
-Or one-liner:
+Or:
 
 ```powershell
 Get-NetTCPConnection -LocalPort 8500 -ErrorAction SilentlyContinue |
   ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
 ```
 
-Repeat for `3306` or `8080` if needed.
-
-### Step 2C — Jenkins / Docker Desktop still holding the port
-
-```powershell
-# Check containers again
-docker ps -a
-
-# Force remove container using the port
-docker rm -f student-api student-api-container 2>$null
-
-# If Jenkins itself must restart (port 8080)
-# Services → Jenkins → Restart   (or)
-Restart-Service Jenkins
-```
-
-### Step 3 — Change the port (only if you cannot free it)
-
-**Spring Boot** — in `application.properties`:
-
-```properties
-server.port=8501
-```
-
-Then Postman / Docker must use **8501** too:
+### Fast fix — port 8500
 
 ```bash
-docker run -d -p 8501:8501 --name student-api-container student-api
-```
-
-**Docker host mapping** (keep app on 8500 inside container, map different host port):
-
-```bash
-docker run -d -p 8501:8500 --name student-api-container student-api
-```
-
-Postman URL becomes: `http://localhost:8501/api/students`
-
-> Prefer **freeing the port** over changing it mid-exam so handbook URLs stay correct.
-
-### Fast exam fix for port 8500
-
-```bash
-docker ps
 docker stop student-api student-api-container 2>NUL
 docker rm student-api student-api-container 2>NUL
 netstat -ano | findstr :8500
-# if a PID remains:
 taskkill /PID <PID> /F
 mvn spring-boot:run
 ```
 
-### Fast exam fix for port 3306
+### Fast fix — port 3306
 
 ```bash
-docker ps
 docker stop student-mysql 2>NUL
 docker rm student-mysql 2>NUL
 docker compose up -d mysql
 ```
 
-### Fast exam fix for port 8080 (Jenkins)
+### Fast fix — port 8080 (Jenkins)
 
 ```powershell
-# See who uses 8080
 netstat -ano | findstr :8080
-# If another app stole 8080, stop it, then start Jenkins service
 Get-Service Jenkins
 Start-Service Jenkins
 ```
 
+### Last resort — change app port
+
+```properties
+server.port=8501
+```
+
+Then Postman: `http://localhost:8501/api/students`  
+Prefer freeing the port so handbook URLs stay `8500`.
+
 ---
 
-## 22. One-page final checklist
+## C5. Docker / Docker Hub problems
 
-### Commands you will type
+| Problem | Fix |
+|---|---|
+| Cannot connect to Docker daemon | Start Docker Desktop |
+| Port already allocated | See **C4** |
+| Communications link failure in container | Use `host.docker.internal` (docker run) or `mysql` (compose) |
+| Container exits immediately | `docker logs <name>` — read startup error |
+| Push denied | `docker login` then tag `razzara/student-api` |
+| Old code still running | `docker build --no-cache -t student-api .` |
+| No space left | `docker system prune -a` |
+
+---
+
+## C6. Jenkins problems
+
+| Problem | Fix |
+|---|---|
+| `mvn: command not found` | Tools name must be exactly `Maven` |
+| `docker: command not found` | Install/start Docker; restart Jenkins |
+| Checkout auth failed | Public repo URL correct; or add GitHub credentials |
+| Port 8500 conflict on Run stage | Stop old containers (see **C4**) before Build Now |
+| Container can’t reach MySQL | Keep `host.docker.internal` in Jenkinsfile env |
+| Pipeline red / Verify failed | Open Console Output + `docker logs student-api-container` |
+
+---
+
+## C7. HTTP status meanings
+
+| Code | Meaning |
+|---|---|
+| 200 | OK (GET / PUT) |
+| 201 | Created (POST) |
+| 204 | No Content (DELETE) |
+| 400 | Bad request / bad JSON |
+| 404 | Wrong URL / not mapped |
+| 500 | Server exception |
+
+---
+
+# PART D — One-Page Final Checklist
+
+### Start → End command strip
 
 ```bash
-# MySQL
+# STEP 07
 docker compose up -d mysql
-
-# Run API locally
 mvn spring-boot:run
 
-# Git
+# STEP 08 — Postman: POST → GET → GET id → PUT → DELETE
+
+# STEP 09
 git add .
 git commit -m "Student CRUD API"
 git push -u origin main
 
-# Docker
+# STEP 10–11
 docker build -t student-api .
 docker compose up -d --build
 docker tag student-api razzara/student-api
 docker push razzara/student-api
 
-# Jenkins
-# Browser → http://localhost:8080 → student-api → Build Now
-```
-
-### Postman order
-
-```
-POST (201) → GET all (200) → GET by id (200) → PUT (200) → DELETE (204)
+# STEP 12
+# http://localhost:8080 → student-api → Build Now
 ```
 
 ### Remember
 
-- Port **8500** everywhere  
-- Include **`id`** in POST body  
-- `jakarta.persistence` not `javax`  
-- Compose DB host = **`mysql`**  
-- Jenkins docker run DB host = **`host.docker.internal`**  
-- GitHub user: **Razaara** · Docker user: **razzara**
+- Follow **Part A steps in order**
+- Port **8500** everywhere
+- Include **`id`** in POST body
+- `jakarta.persistence` not `javax`
+- Compose DB host = **`mysql`**
+- Jenkins DB host = **`host.docker.internal`**
+- GitHub: **Razaara** · Docker: **razzara**
+- Broken? → **Part C Problems and Fixing**
 
 ### Viva quick answers
 
-- `@Component` vs `@Service` vs `@Repository` — same stereotype, different layer meaning  
-- DI — Spring injects beans (prefer constructor / `@RequiredArgsConstructor`)  
-- `JpaRepository` vs `CrudRepository` — Jpa adds paging/sorting/JPA helpers  
+- `@Component` vs `@Service` vs `@Repository` — same mechanism, different layer meaning  
+- Dependency Injection — Spring injects beans (constructor / `@RequiredArgsConstructor`)  
+- `JpaRepository` vs `CrudRepository` — Jpa adds paging/sorting helpers  
 - Image vs Container — image = template; container = running instance  
-- Declarative Jenkins pipeline — `pipeline { stages { ... } }` in Jenkinsfile  
+- Declarative pipeline — `pipeline { stages { ... } }` in Jenkinsfile  
 
 ---
 
 **End of handbook.**  
-Project path: `C:\Users\rasar\OneDrive\Desktop\SOC`  
+Project: `C:\Users\rasar\OneDrive\Desktop\SOC`  
 Repo: https://github.com/Razaara/student-api
