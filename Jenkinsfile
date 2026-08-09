@@ -2,45 +2,68 @@ pipeline {
     agent any
 
     tools {
-        maven 'maven3'
-        jdk 'jdk21'
+        // Must match Manage Jenkins → Tools → Maven installations → Name
+        maven 'Maven'
     }
 
     environment {
         IMAGE_NAME = 'student-api'
-        // Matches docker-compose.yml service / container
-        COMPOSE_PROJECT_NAME = 'soc'
+        CONTAINER_NAME = 'student-api-container'
+        // Host MySQL from docker-compose service student-mysql on port 3306
+        DB_URL = 'jdbc:mysql://host.docker.internal:3306/students?createDatabaseIfNotExist=true'
+        DB_USER = 'root'
+        DB_PASS = 'root'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                // CHANGE only if your fork/URL differs
                 git branch: 'main', url: 'https://github.com/Razaara/student-api.git'
             }
         }
 
         stage('Build with Maven') {
             steps {
-                // Compile/package on the Jenkins agent (exam-visible Maven stage)
                 bat 'mvn clean package -DskipTests'
             }
         }
 
-        stage('Deploy with Docker Compose') {
+        stage('Build Docker Image') {
             steps {
-                // Full stack: MySQL (healthy) + Spring Boot on port 8500
-                // Uses service hostname "mysql" inside the compose network
-                bat 'docker compose down'
-                bat 'docker compose up -d --build'
+                bat 'docker build -t %IMAGE_NAME% .'
             }
         }
 
-        stage('Verify Deployment') {
+        stage('Stop Old Container') {
             steps {
-                bat 'docker compose ps'
-                bat 'docker compose logs --tail 40 springboot'
-                // Retry until Spring Boot answers on :8500 (up to ~90s)
+                // Windows-safe: ignore error if container does not exist
+                bat 'docker stop %CONTAINER_NAME% 2>NUL || exit /b 0'
+            }
+        }
+
+        stage('Remove Old Container') {
+            steps {
+                bat 'docker rm %CONTAINER_NAME% 2>NUL || exit /b 0'
+            }
+        }
+
+        stage('Run New Container') {
+            steps {
+                // Pass DB settings so the container can reach MySQL on the host/Docker Desktop
+                bat '''
+                    docker run -d ^
+                      -p 8500:8500 ^
+                      --name %CONTAINER_NAME% ^
+                      -e SPRING_DATASOURCE_URL=%DB_URL% ^
+                      -e SPRING_DATASOURCE_USERNAME=%DB_USER% ^
+                      -e SPRING_DATASOURCE_PASSWORD=%DB_PASS% ^
+                      %IMAGE_NAME%
+                '''
+            }
+        }
+
+        stage('Verify') {
+            steps {
                 bat '''
                     setlocal EnableDelayedExpansion
                     set OK=0
@@ -57,10 +80,10 @@ pipeline {
                     :done
                     if !OK! NEQ 1 (
                       echo API did not become ready
-                      docker compose logs --tail 120 springboot
+                      docker logs %CONTAINER_NAME%
                       exit /b 1
                     )
-                    curl.exe -s -w "HTTP %%{http_code}" http://localhost:8500/api/students
+                    curl.exe -s http://localhost:8500/api/students
                     echo.
                 '''
             }
@@ -72,10 +95,8 @@ pipeline {
             echo 'Deployment successful. API: http://localhost:8500/api/students'
         }
         failure {
-            echo 'Pipeline failed — check console output / Docker logs.'
-            bat 'docker compose ps || exit /b 0'
-            bat 'docker compose logs --tail 120 springboot || exit /b 0'
-            bat 'docker compose logs --tail 80 mysql || exit /b 0'
+            echo 'Pipeline failed — check console output.'
+            bat 'docker logs %CONTAINER_NAME% 2>NUL || exit /b 0'
         }
     }
 }
