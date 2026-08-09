@@ -71,11 +71,20 @@ docker push razzara/student-api:latest
 
 ## Jenkins
 
+Job name in Jenkins: **`student-api`**  
+URL: http://localhost:8080/job/student-api/
+
 Declarative `Jenkinsfile` stages:
 
 1. Checkout — `https://github.com/Razaara/student-api.git`
 2. Build with Maven — `mvn clean package -DskipTests`
-3. Deploy with Docker Compose — MySQL + Spring Boot (`8500`)
-4. Verify — retries `GET /api/students` until healthy
+3. Build Docker Image — `docker build -t student-api .`
+4. Stop / Remove old container (`student-api-container`)
+5. Run new container on `8500:8500` with MySQL env (`host.docker.internal`)
+6. Verify — retries `GET /api/students` until healthy
 
-**Jenkins setup:** Tools named `maven3` and `jdk21`, Docker available to the agent, job type **Pipeline** → Pipeline script from SCM (this repo) **or** paste the `Jenkinsfile`.
+**Jenkins setup required**
+- Tool name **Maven** (Manage Jenkins → Tools) — already matches this machine
+- Docker available to the Jenkins agent
+- MySQL running on host port `3306` (e.g. `docker compose up -d mysql`)
+- Pipeline job → **Pipeline script from SCM** → Git → this repo → script path `Jenkinsfile`
