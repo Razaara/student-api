@@ -9,6 +9,8 @@ pipeline {
     environment {
         IMAGE_NAME = 'student-api'
         CONTAINER_NAME = 'student-api-container'
+        // Must match Manage Jenkins → System → SonarQube servers → Name
+        SONARQUBE_SERVER = 'sonar'
         // Host MySQL from docker-compose service student-mysql on port 3306
         DB_URL = 'jdbc:mysql://host.docker.internal:3306/students?createDatabaseIfNotExist=true'
         DB_USER = 'root'
@@ -25,6 +27,24 @@ pipeline {
         stage('Build with Maven') {
             steps {
                 bat 'mvn clean package -DskipTests'
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                // Requires SonarQube Scanner for Maven + server named "sonar" in Jenkins
+                withSonarQubeEnv("${env.SONARQUBE_SERVER}") {
+                    bat 'mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=student-api -Dsonar.projectName=student-api'
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                // Wait for SonarQube webhook / analysis result (do not fail deploy on gate fail in exam)
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: false
+                }
             }
         }
 
@@ -93,9 +113,10 @@ pipeline {
     post {
         success {
             echo 'Deployment successful. API: http://localhost:8500/api/students'
+            echo 'SonarQube project: student-api (check SonarQube dashboard)'
         }
         failure {
-            echo 'Pipeline failed — check console output.'
+            echo 'Pipeline failed — check console output / SonarQube / Docker logs.'
             bat 'docker logs %CONTAINER_NAME% 2>NUL || exit /b 0'
         }
     }

@@ -78,13 +78,17 @@ Declarative `Jenkinsfile` stages:
 
 1. Checkout — `https://github.com/Razaara/student-api.git`
 2. Build with Maven — `mvn clean package -DskipTests`
-3. Build Docker Image — `docker build -t student-api .`
-4. Stop / Remove old container (`student-api-container`)
-5. Run new container on `8500:8500` with MySQL env (`host.docker.internal`)
-6. Verify — retries `GET /api/students` until healthy
+3. **SonarQube Analysis** — `withSonarQubeEnv('sonar')` + Maven sonar plugin
+4. **Quality Gate** — `waitForQualityGate abortPipeline: false`
+5. Build Docker Image — `docker build -t student-api .`
+6. Stop / Remove old container (`student-api-container`)
+7. Run new container on `8500:8500` with MySQL env (`host.docker.internal`)
+8. Verify — retries `GET /api/students` until healthy
 
-**Jenkins setup required**
-- Tool name **Maven** (Manage Jenkins → Tools) — already matches this machine
+**Jenkins + SonarQube setup**
+- Tool name **Maven** (Manage Jenkins → Tools)
+- SonarQube server name **`sonar`** (Manage Jenkins → System) → URL `http://localhost:9000` + token
 - Docker available to the Jenkins agent
 - MySQL running on host port `3306` (e.g. `docker compose up -d mysql`)
 - Pipeline job → **Pipeline script from SCM** → Git → this repo → script path `Jenkinsfile`
+- See `sonar-project.properties` and exam guidance PDF for full Sonar setup
