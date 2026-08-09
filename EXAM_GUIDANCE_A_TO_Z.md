@@ -39,7 +39,9 @@
 17. [Jenkins pipeline](#17-jenkins-pipeline)
 18. [Annotations cheat sheet](#18-annotations-cheat-sheet)
 19. [Common errors and fixes](#19-common-errors-and-fixes)
-20. [One-page final checklist](#20-one-page-final-checklist)
+20. [Common Git issues](#20-common-git-issues)
+21. [Ports already in use — how to fix](#21-ports-already-in-use--how-to-fix)
+22. [One-page final checklist](#22-one-page-final-checklist)
 
 ---
 
@@ -525,6 +527,8 @@ Expect: **204** (empty body).
 
 ## 13. Git + GitHub
 
+> Common Git errors (auth, rejected push, wrong remote, shared PC): see **[§20 Common Git issues](#20-common-git-issues)**.
+
 ### .gitignore
 
 ```
@@ -875,7 +879,7 @@ Verified: Jenkins job `student-api` build **#1 SUCCESS**.
 
 | Error | Fix |
 |---|---|
-| Port 8500 already in use | Stop old container/app: `docker stop student-api-container` |
+| Port 8500 / 3306 / 8080 already in use | See [§21](#21-ports-already-in-use--how-to-fix) |
 | Communications link failure | Start MySQL: `docker compose up -d mysql` |
 | Access denied for user root | Password must be `root` (match Compose) |
 | Unknown database | Use `createDatabaseIfNotExist=true` |
@@ -885,12 +889,224 @@ Verified: Jenkins job `student-api` build **#1 SUCCESS**.
 | Docker push denied | `docker login` + tag as `razzara/student-api` |
 | Jenkins `mvn` not found | Tools name must be exactly `Maven` |
 | Jenkins container can’t reach DB | Use `host.docker.internal` (as in Jenkinsfile) |
-| Git auth failed | Use PAT / re-login in Credential Manager |
+| Git problems | See [§20](#20-common-git-issues) |
 | POST 400 in PowerShell curl | JSON escaping broken — use Postman instead |
 
 ---
 
-## 20. One-page final checklist
+## 20. Common Git issues
+
+Use these during the exam when `git push` / commit fails.
+
+| Issue / Error | Cause | Fix |
+|---|---|---|
+| `fatal: not a git repository` | Wrong folder or never ran `git init` | `cd` into project folder, then `git init` |
+| `fatal: remote origin already exists` | You already added origin | `git remote set-url origin https://github.com/Razaara/student-api.git` |
+| `Updates were rejected` / non-fast-forward | Remote has commits you don’t have | `git pull origin main` (or `git pull --rebase`) then `git push` |
+| `Authentication failed` / `Password authentication is not supported` | GitHub blocks account password for HTTPS | Use Personal Access Token (PAT) as password, or sign in via Git Credential Manager |
+| Wrong GitHub account on shared PC | Old credentials stored in Windows | Credential Manager → Windows Credentials → remove `github.com` → push again and login |
+| `Permission denied (publickey)` | SSH key not set up | Switch remote to HTTPS: `git remote set-url origin https://github.com/YOUR_USER/YOUR_REPO.git` |
+| `Everything up-to-date` but files missing on GitHub | Forgot to commit | `git status` → `git add .` → `git commit -m "msg"` → `git push` |
+| Accidentally committed `target/` | Build folder should be ignored | Add `target/` to `.gitignore`, then `git rm -r --cached target/` → commit → push |
+| Merge conflict (`<<<<<<<`) | Same lines changed in two commits | Edit file, remove markers, keep correct code → `git add .` → `git commit` |
+| `fatal: refusing to merge unrelated histories` | New local repo + existing GitHub repo | `git pull origin main --allow-unrelated-histories` then resolve / push |
+| Wrong commit message (not pushed yet) | Typo in last commit | `git commit --amend -m "correct message"` |
+| Detached HEAD | Checked out a commit hash, not a branch | `git checkout main` |
+| `Please tell me who you are` | Git identity not set | `git config user.name "Your Name"` and `git config user.email "you@email.com"` |
+
+### Quick Git recovery commands
+
+```bash
+# See what is wrong
+git status
+git remote -v
+git log --oneline -5
+
+# Fix wrong remote URL
+git remote set-url origin https://github.com/Razaara/student-api.git
+
+# Pull then push (rejected updates)
+git pull origin main
+git push origin main
+
+# Remove tracked target/ after adding .gitignore
+git rm -r --cached target/
+git add .
+git commit -m "Stop tracking target folder"
+git push
+
+# Clear old GitHub credential (Windows)
+# Search: Credential Manager → Windows Credentials → Remove github.com entries
+# Then:
+git push
+# Login popup → use YOUR GitHub account / PAT
+```
+
+### Shared university PC checklist
+
+```
+1. Credential Manager → remove old github.com credentials
+2. git config user.name "Your Name"
+3. git config user.email "your-email@example.com"
+4. git remote -v   (must be YOUR repo)
+5. git add . → git commit -m "..." → git push
+6. Login with YOUR GitHub account when prompted
+```
+
+> `git config user.name` / `user.email` only set the **author name on commits**. They do **not** authenticate you. Authentication = GitHub login / PAT / Credential Manager.
+
+---
+
+## 21. Ports already in use — how to fix
+
+This project / tools commonly use:
+
+| Port | Used by |
+|---|---|
+| **8500** | Spring Boot Student API |
+| **3306** | MySQL |
+| **8080** | Jenkins |
+
+### Symptoms
+
+- Spring Boot: `Port 8500 was already in use`
+- Docker: `Bind for 0.0.0.0:8500 failed: port is already allocated`
+- Jenkins / browser: wrong app opens, or service won’t start
+
+### Step 1 — See what is using the port (Windows)
+
+**PowerShell:**
+
+```powershell
+# Replace 8500 with 3306 or 8080 as needed
+netstat -ano | findstr :8500
+```
+
+Last column = **PID** (process id).
+
+**Or:**
+
+```powershell
+Get-NetTCPConnection -LocalPort 8500 -ErrorAction SilentlyContinue |
+  Select-Object LocalPort,OwningProcess,State
+```
+
+### Step 2A — Stop Docker containers (most common in this exam)
+
+```bash
+docker ps
+docker stop student-api
+docker stop student-api-container
+docker rm student-api
+docker rm student-api-container
+
+# If MySQL port 3306 is stuck on an old container:
+docker stop student-mysql
+docker rm student-mysql
+
+# Or stop everything from this project:
+cd C:\Users\rasar\OneDrive\Desktop\SOC
+docker compose down
+```
+
+Then start only what you need:
+
+```bash
+docker compose up -d mysql
+# later run app with mvn OR full compose / Jenkins
+```
+
+### Step 2B — Kill a normal Windows process (Java / old Spring Boot)
+
+```powershell
+# Find PID for port 8500
+netstat -ano | findstr :8500
+
+# Kill that PID (example: 12345)
+taskkill /PID 12345 /F
+```
+
+Or one-liner:
+
+```powershell
+Get-NetTCPConnection -LocalPort 8500 -ErrorAction SilentlyContinue |
+  ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
+```
+
+Repeat for `3306` or `8080` if needed.
+
+### Step 2C — Jenkins / Docker Desktop still holding the port
+
+```powershell
+# Check containers again
+docker ps -a
+
+# Force remove container using the port
+docker rm -f student-api student-api-container 2>$null
+
+# If Jenkins itself must restart (port 8080)
+# Services → Jenkins → Restart   (or)
+Restart-Service Jenkins
+```
+
+### Step 3 — Change the port (only if you cannot free it)
+
+**Spring Boot** — in `application.properties`:
+
+```properties
+server.port=8501
+```
+
+Then Postman / Docker must use **8501** too:
+
+```bash
+docker run -d -p 8501:8501 --name student-api-container student-api
+```
+
+**Docker host mapping** (keep app on 8500 inside container, map different host port):
+
+```bash
+docker run -d -p 8501:8500 --name student-api-container student-api
+```
+
+Postman URL becomes: `http://localhost:8501/api/students`
+
+> Prefer **freeing the port** over changing it mid-exam so handbook URLs stay correct.
+
+### Fast exam fix for port 8500
+
+```bash
+docker ps
+docker stop student-api student-api-container 2>NUL
+docker rm student-api student-api-container 2>NUL
+netstat -ano | findstr :8500
+# if a PID remains:
+taskkill /PID <PID> /F
+mvn spring-boot:run
+```
+
+### Fast exam fix for port 3306
+
+```bash
+docker ps
+docker stop student-mysql 2>NUL
+docker rm student-mysql 2>NUL
+docker compose up -d mysql
+```
+
+### Fast exam fix for port 8080 (Jenkins)
+
+```powershell
+# See who uses 8080
+netstat -ano | findstr :8080
+# If another app stole 8080, stop it, then start Jenkins service
+Get-Service Jenkins
+Start-Service Jenkins
+```
+
+---
+
+## 22. One-page final checklist
 
 ### Commands you will type
 
