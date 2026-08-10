@@ -10,12 +10,17 @@
 | Local folder | `C:\Users\rasar\OneDrive\Desktop\SOC` |
 | GitHub | https://github.com/Razaara/student-api |
 | Docker Hub | `razzara/student-api` |
-| Port | **8500** |
+| Port | **8500** (API) · **3306** (MySQL) · **8080** (Jenkins) · **9000** (SonarQube) |
 | Base URL | `http://localhost:8500/api/students` |
 | DB name | `students` |
 | DB user / pass | `root` / `root` |
 | Java | 21 |
 | Spring Boot | 3.4.5 |
+| Jenkins job | `student-api` (branch `*/main`) |
+| Jenkins Maven tool | `Maven` |
+| SonarQube server name | `sonar` |
+| SonarQube project key | `jenkins` (must match your analysis token’s project) |
+| Jenkins Sonar credential ID | `sonar` |
 
 ---
 
@@ -35,21 +40,47 @@
 Do these steps in order. Do not skip ahead unless the examiner asks.
 
 ```
-STEP 01  Create Spring Boot project
+STEP 01  Create Spring Boot project (Desktop\SOC)
 STEP 02  Project structure + .gitignore
 STEP 03  pom.xml dependencies
-STEP 04  application.properties
-STEP 05  Main class
+STEP 04  application.properties (port 8500, DB root/root)
+STEP 05  Main class (StudentApiApplication)
 STEP 06  Entity → Repository → Service → Controller
-STEP 07  Start MySQL + run the app
-STEP 08  Test with Postman (all 5 endpoints)
-STEP 09  Git commit + push to GitHub
-STEP 10  Docker (Dockerfile / compose)
-STEP 11  Push image to Docker Hub
-STEP 12  Jenkins Pipeline (+ SonarQube) → Build Now → re-test
+STEP 07  Start MySQL + run app (docker compose / mvn)
+STEP 08  Test with Postman (POST→GET→PUT→DELETE)
+STEP 09  Git push to GitHub (Razaara/student-api)
+STEP 10  Docker build / docker compose up
+STEP 11  Push image to Docker Hub (razzara/student-api)
+STEP 12  SonarQube token + Jenkins config
+STEP 13  Jenkins Pipeline Build Now → verify API + Sonar
 ```
 
-**If time is short:** Steps 01–08 first → 09 Git → 10 Docker → 12 Jenkins last.
+**Aligned full flow (what you actually do on exam day):**
+
+```
+Code CRUD
+   ↓
+MySQL up → mvn spring-boot:run → Postman test
+   ↓
+git add / commit / push (main)
+   ↓
+docker compose up -d --build   (or docker build/run)
+   ↓
+docker tag + push razzara/student-api
+   ↓
+SonarQube running (:9000) → create/use project key "jenkins" → token
+   ↓
+Jenkins credential ID "sonar" + server name "sonar"
+   ↓
+Job student-api (branch */main, Jenkinsfile) → Build Now
+   ↓
+Stages: Checkout → Maven → Sonar → Quality Gate → Docker → Run → Verify
+   ↓
+Check: http://localhost:8500/api/students
+       http://localhost:9000/dashboard?id=jenkins
+```
+
+**If time is short:** Steps 01–08 first → 09 Git → 10 Docker → 12–13 Jenkins/Sonar last.
 
 ---
 
@@ -713,209 +744,112 @@ docker pull razzara/student-api:latest
 
 ---
 
-## STEP 12 — Jenkins Pipeline (+ SonarQube)
+## STEP 12 — SonarQube token + Jenkins config
 
-### 12.1 One-time tools
+### 12.1 Start services
 
-**Manage Jenkins → Tools**
+```bash
+docker start sonarqube
+cd C:\Users\rasar\OneDrive\Desktop\SOC
+docker compose up -d mysql
+```
 
-- Maven name must be exactly: **`Maven`**
-- Java 21 on the machine
-- Docker Desktop running
+- SonarQube: http://localhost:9000  
+- Jenkins: http://localhost:8080  
+- MySQL: port **3306**
 
-### 12.2 Configure SonarQube in Jenkins (one-time)
+### 12.2 Get SonarQube token (atomic)
 
-1. Start SonarQube (usually http://localhost:9000) and login
-2. SonarQube → **My Account → Security → Generate Tokens** → copy token
-3. Jenkins → **Manage Jenkins → Plugins** → install:
-   - **SonarQube Scanner**
-   - **SonarQube Quality Gates** (comes with SonarQube plugin pack)
-4. Jenkins → **Manage Jenkins → Credentials** → Add:
+1. Login SonarQube
+2. Open/create project with key **`jenkins`** (must match your analysis token)
+3. **My Account → Security → Generate Token** → copy token
+
+### 12.3 Put token into Jenkins (atomic)
+
+1. Jenkins → **Manage Jenkins → Credentials → System → Global credentials**
+2. Add/Update:
    - Kind: **Secret text**
-   - Secret: *(SonarQube token)*
-   - ID: `sonar-token` (any id you like)
-5. Jenkins → **Manage Jenkins → System → SonarQube servers → Add SonarQube**
-   - **Name:** `sonar`  ← must match Jenkinsfile `SONARQUBE_SERVER`
-   - **Server URL:** `http://localhost:9000`
-   - **Server authentication token:** select the credential above
-6. (Recommended) In SonarQube → **Administration → Configuration → Webhooks**
+   - Secret: *(paste token)*
+   - ID: **`sonar`**
+3. **Manage Jenkins → System → SonarQube servers**
+   - Name: **`sonar`**
+   - URL: `http://localhost:9000`
+   - Token credential: **`sonar`**
+4. Save
+5. (Recommended) SonarQube → **Administration → Webhooks**
    - URL: `http://localhost:8080/sonarqube-webhook/`
-   - So Jenkins `waitForQualityGate` can finish
 
-### 12.3 sonar-project.properties
+### 12.4 Create / check Jenkins job (atomic)
 
-**File:** project root `sonar-project.properties`
+1. **New Item** → name `student-api` → **Pipeline**
+2. Definition: **Pipeline script from SCM**
+3. Git URL: `https://github.com/Razaara/student-api.git`
+4. Branch: **`*/main`** (not master)
+5. Script Path: `Jenkinsfile`
+6. Save
 
-```properties
-sonar.projectKey=student-api
-sonar.projectName=student-api
-sonar.projectVersion=1.0
-sonar.sources=src/main/java
-sonar.java.binaries=target/classes
-sonar.sourceEncoding=UTF-8
-sonar.exclusions=**/target/**,**/*.class
-```
+### 12.5 Tools must match
 
-Also in `pom.xml` properties:
+- Maven tool name: **`Maven`**
+- Sonar server name: **`sonar`**
+- Sonar project key in Jenkinsfile: **`jenkins`**
 
-```xml
-<sonar.projectKey>student-api</sonar.projectKey>
-<sonar.projectName>student-api</sonar.projectName>
-<sonar.java.binaries>target/classes</sonar.java.binaries>
-```
+---
 
-### 12.4 Create Jenkins job
+## STEP 13 — Build pipeline + verify
 
-1. http://localhost:8080 → Login
-2. **New Item** → `student-api` → **Pipeline**
-3. Pipeline script from SCM → Git
-4. URL: `https://github.com/Razaara/student-api.git`
-5. Branch: `*/main` · Script Path: `Jenkinsfile`
-6. Save → **Build Now**
-
-### 12.5 Before Build Now
+### 13.1 Before Build Now
 
 ```bash
 docker compose up -d mysql
 docker stop student-api student-api-container 2>NUL
 docker rm student-api student-api-container 2>NUL
-# SonarQube must be running on http://localhost:9000
+docker start sonarqube
 ```
 
-### 12.6 Jenkinsfile (with SonarQube)
+### 13.2 Build Now
+
+Jenkins → job **student-api** → **Build Now**
+
+### 13.3 Pipeline stages (aligned)
+
+```
+1 Checkout
+2 Build with Maven
+3 SonarQube Analysis          ← project key "jenkins"
+4 Quality Gate                ← webhook recommended; won't abort whole job
+5 Build Docker Image
+6 Stop Old Container
+7 Remove Old Container
+8 Run New Container           ← port 8500 + host.docker.internal MySQL
+9 Verify                      ← GET /api/students
+```
+
+### 13.4 After SUCCESS
+
+| Check | URL |
+|---|---|
+| API | http://localhost:8500/api/students |
+| Sonar dashboard | http://localhost:9000/dashboard?id=jenkins |
+| Jenkins job | http://localhost:8080/job/student-api/ |
+
+### 13.5 Current working Jenkinsfile (summary env)
 
 ```groovy
-pipeline {
-    agent any
-
-    tools {
-        maven 'Maven'
-    }
-
-    environment {
-        IMAGE_NAME = 'student-api'
-        CONTAINER_NAME = 'student-api-container'
-        // Must match Manage Jenkins → System → SonarQube servers → Name
-        SONARQUBE_SERVER = 'sonar'
-        DB_URL = 'jdbc:mysql://host.docker.internal:3306/students?createDatabaseIfNotExist=true'
-        DB_USER = 'root'
-        DB_PASS = 'root'
-    }
-
-    stages {
-        stage('Checkout') {
-            steps {
-                git branch: 'main', url: 'https://github.com/Razaara/student-api.git'
-            }
-        }
-
-        stage('Build with Maven') {
-            steps {
-                bat 'mvn clean package -DskipTests'
-            }
-        }
-
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv("${env.SONARQUBE_SERVER}") {
-                    bat 'mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=student-api -Dsonar.projectName=student-api'
-                }
-            }
-        }
-
-        stage('Quality Gate') {
-            steps {
-                timeout(time: 5, unit: 'MINUTES') {
-                    // abortPipeline:false → still deploy even if gate fails (safer in exam)
-                    waitForQualityGate abortPipeline: false
-                }
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                bat 'docker build -t %IMAGE_NAME% .'
-            }
-        }
-
-        stage('Stop Old Container') {
-            steps {
-                bat 'docker stop %CONTAINER_NAME% 2>NUL || exit /b 0'
-            }
-        }
-
-        stage('Remove Old Container') {
-            steps {
-                bat 'docker rm %CONTAINER_NAME% 2>NUL || exit /b 0'
-            }
-        }
-
-        stage('Run New Container') {
-            steps {
-                bat '''
-                    docker run -d ^
-                      -p 8500:8500 ^
-                      --name %CONTAINER_NAME% ^
-                      -e SPRING_DATASOURCE_URL=%DB_URL% ^
-                      -e SPRING_DATASOURCE_USERNAME=%DB_USER% ^
-                      -e SPRING_DATASOURCE_PASSWORD=%DB_PASS% ^
-                      %IMAGE_NAME%
-                '''
-            }
-        }
-
-        stage('Verify') {
-            steps {
-                bat '''
-                    setlocal EnableDelayedExpansion
-                    set OK=0
-                    for /L %%i in (1,1,18) do (
-                      curl.exe -f -s -o NUL http://localhost:8500/api/students
-                      if !ERRORLEVEL! EQU 0 (
-                        echo API is UP
-                        set OK=1
-                        goto :done
-                      )
-                      echo Waiting for API... attempt %%i
-                      ping -n 6 127.0.0.1 >NUL
-                    )
-                    :done
-                    if !OK! NEQ 1 (
-                      echo API did not become ready
-                      docker logs %CONTAINER_NAME%
-                      exit /b 1
-                    )
-                    curl.exe -s http://localhost:8500/api/students
-                    echo.
-                '''
-            }
-        }
-    }
-
-    post {
-        success {
-            echo 'Deployment successful. API: http://localhost:8500/api/students'
-            echo 'SonarQube project: student-api'
-        }
-        failure {
-            echo 'Pipeline failed — check console / SonarQube / Docker logs.'
-            bat 'docker logs %CONTAINER_NAME% 2>NUL || exit /b 0'
-        }
-    }
+environment {
+    IMAGE_NAME = 'student-api'
+    CONTAINER_NAME = 'student-api-container'
+    SONARQUBE_SERVER = 'sonar'
+    SONAR_PROJECT_KEY = 'jenkins'
+    SONAR_PROJECT_NAME = 'jenkins'
+    DB_URL = 'jdbc:mysql://host.docker.internal:3306/students?createDatabaseIfNotExist=true'
+    DB_USER = 'root'
+    DB_PASS = 'root'
 }
 ```
 
-### Pipeline stages (examiner view)
-
-```
-Checkout → Maven Build → SonarQube Analysis → Quality Gate →
-Docker Build → Stop → Remove → Run → Verify
-```
-
-### 12.7 After SUCCESS
-
-1. Re-test API: `http://localhost:8500/api/students`
-2. Open SonarQube: http://localhost:9000 → project **`student-api`** → see issues / coverage / quality gate
+> Your Sonar analysis token must belong to project key **`jenkins`**.  
+> If you create a new project/token with another key, change `SONAR_PROJECT_KEY` to match.
 
 ---
 
