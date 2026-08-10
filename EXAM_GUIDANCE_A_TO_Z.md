@@ -49,7 +49,7 @@ STEP 06  Entity → Repository → Service → Controller
 STEP 07  Start MySQL + run app (docker compose / mvn)
 STEP 08  Test with Postman (POST→GET→PUT→DELETE)
 STEP 09  Git push to GitHub (Razaara/student-api)
-STEP 10  Docker build / docker compose up
+STEP 10  Docker build / docker compose up (MySQL + API + SonarQube)
 STEP 11  Push image to Docker Hub (razzara/student-api)
 STEP 12  SonarQube token + Jenkins config
 STEP 13  Jenkins Pipeline Build Now → verify API + Sonar
@@ -677,7 +677,7 @@ docker run -d -p 8500:8500 --name student-api-container ^
 docker logs -f student-api-container
 ```
 
-### 10.3 docker-compose.yml (MySQL + API together)
+### 10.3 docker-compose.yml (MySQL + API + SonarQube)
 
 ```yaml
 services:
@@ -713,18 +713,65 @@ services:
       mysql:
         condition: service_healthy
 
+  sonarqube:
+    image: sonarqube:lts-community
+    container_name: sonarqube
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    environment:
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+
 volumes:
   mysql_data:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
 ```
 
+### Compose commands
+
 ```bash
+cd C:\Users\rasar\OneDrive\Desktop\SOC
+
+# If an old standalone Sonar container exists, remove it first:
+docker stop sonarqube 2>NUL
+docker rm sonarqube 2>NUL
+
+# Start MySQL + API + SonarQube together
 docker compose up -d --build
+
 docker compose ps
 docker compose logs -f springboot
+docker compose logs -f sonarqube
 docker compose down
 ```
 
-> Compose DB host = service name **`mysql`**. Single `docker run` DB host = **`host.docker.internal`**.
+### Start only some services
+
+```bash
+# MySQL only
+docker compose up -d mysql
+
+# MySQL + Sonar (no API container)
+docker compose up -d mysql sonarqube
+
+# Sonar only
+docker compose up -d sonarqube
+```
+
+| Service | URL / Port |
+|---|---|
+| API | http://localhost:8500/api/students |
+| SonarQube | http://localhost:9000 |
+| MySQL | localhost:3306 |
+
+> Compose DB host = service name **`mysql`**. Single `docker run` DB host = **`host.docker.internal`**.  
+> SonarQube needs **1–2 minutes** after start before http://localhost:9000 loads.
 
 ---
 
@@ -749,9 +796,9 @@ docker pull razzara/student-api:latest
 ### 12.1 Start services
 
 ```bash
-docker start sonarqube
 cd C:\Users\rasar\OneDrive\Desktop\SOC
-docker compose up -d mysql
+docker compose up -d mysql sonarqube
+# or everything: docker compose up -d --build
 ```
 
 - SonarQube: http://localhost:9000  
