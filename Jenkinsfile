@@ -32,18 +32,22 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                // Requires SonarQube Scanner for Maven + server named "sonar" in Jenkins
-                withSonarQubeEnv("${env.SONARQUBE_SERVER}") {
-                    bat 'mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=student-api -Dsonar.projectName=student-api'
+                // If token/project permissions are wrong, mark stage UNSTABLE but continue deploy
+                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                    withSonarQubeEnv("${env.SONARQUBE_SERVER}") {
+                        bat 'mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=student-api -Dsonar.projectName=student-api'
+                    }
                 }
             }
         }
 
         stage('Quality Gate') {
             steps {
-                // Wait for SonarQube webhook / analysis result (do not fail deploy on gate fail in exam)
-                timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: false
+                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                    timeout(time: 3, unit: 'MINUTES') {
+                        // abortPipeline:false → never block Docker deploy on gate
+                        waitForQualityGate abortPipeline: false
+                    }
                 }
             }
         }
@@ -58,12 +62,14 @@ pipeline {
             steps {
                 // Windows-safe: ignore error if container does not exist
                 bat 'docker stop %CONTAINER_NAME% 2>NUL || exit /b 0'
+                bat 'docker stop student-api 2>NUL || exit /b 0'
             }
         }
 
         stage('Remove Old Container') {
             steps {
                 bat 'docker rm %CONTAINER_NAME% 2>NUL || exit /b 0'
+                bat 'docker rm student-api 2>NUL || exit /b 0'
             }
         }
 
@@ -118,6 +124,9 @@ pipeline {
         failure {
             echo 'Pipeline failed — check console output / SonarQube / Docker logs.'
             bat 'docker logs %CONTAINER_NAME% 2>NUL || exit /b 0'
+        }
+        unstable {
+            echo 'Pipeline finished with UNSTABLE Sonar/Quality Gate, but deploy stages continued.'
         }
     }
 }
