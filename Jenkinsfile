@@ -35,9 +35,15 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                // Token must be Project Analysis Token for SONAR_PROJECT_KEY (or Global/User token)
+                // Token must belong to SONAR_PROJECT_KEY (current token is for project "jenkins")
                 withSonarQubeEnv("${env.SONARQUBE_SERVER}") {
-                    bat "mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=%SONAR_PROJECT_KEY% -Dsonar.projectName=%SONAR_PROJECT_NAME%"
+                    bat '''
+                        mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.7.0.6970:sonar ^
+                          -Dsonar.projectKey=%SONAR_PROJECT_KEY% ^
+                          -Dsonar.projectName=%SONAR_PROJECT_NAME% ^
+                          -Dsonar.host.url=%SONAR_HOST_URL% ^
+                          -Dsonar.login=%SONAR_AUTH_TOKEN%
+                    '''
                 }
             }
         }
