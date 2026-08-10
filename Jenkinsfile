@@ -11,6 +11,9 @@ pipeline {
         CONTAINER_NAME = 'student-api-container'
         // Must match Manage Jenkins → System → SonarQube servers → Name
         SONARQUBE_SERVER = 'sonar'
+        // Must match the SonarQube project the analysis TOKEN was created for
+        SONAR_PROJECT_KEY = 'jenkins'
+        SONAR_PROJECT_NAME = 'jenkins'
         // Host MySQL from docker-compose service student-mysql on port 3306
         DB_URL = 'jdbc:mysql://host.docker.internal:3306/students?createDatabaseIfNotExist=true'
         DB_USER = 'root'
@@ -32,22 +35,18 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                // If token/project permissions are wrong, mark stage UNSTABLE but continue deploy
-                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                    withSonarQubeEnv("${env.SONARQUBE_SERVER}") {
-                        bat 'mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=student-api -Dsonar.projectName=student-api'
-                    }
+                // Token must be Project Analysis Token for SONAR_PROJECT_KEY (or Global/User token)
+                withSonarQubeEnv("${env.SONARQUBE_SERVER}") {
+                    bat "mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=%SONAR_PROJECT_KEY% -Dsonar.projectName=%SONAR_PROJECT_NAME%"
                 }
             }
         }
 
         stage('Quality Gate') {
             steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                    timeout(time: 3, unit: 'MINUTES') {
-                        // abortPipeline:false → never block Docker deploy on gate
-                        waitForQualityGate abortPipeline: false
-                    }
+                // Requires successful analysis (report-task.txt). Prefer Sonar webhook to Jenkins.
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: false
                 }
             }
         }
@@ -60,7 +59,6 @@ pipeline {
 
         stage('Stop Old Container') {
             steps {
-                // Windows-safe: ignore error if container does not exist
                 bat 'docker stop %CONTAINER_NAME% 2>NUL || exit /b 0'
                 bat 'docker stop student-api 2>NUL || exit /b 0'
             }
@@ -75,7 +73,6 @@ pipeline {
 
         stage('Run New Container') {
             steps {
-                // Pass DB settings so the container can reach MySQL on the host/Docker Desktop
                 bat '''
                     docker run -d ^
                       -p 8500:8500 ^
@@ -119,14 +116,11 @@ pipeline {
     post {
         success {
             echo 'Deployment successful. API: http://localhost:8500/api/students'
-            echo 'SonarQube project: student-api (check SonarQube dashboard)'
+            echo "SonarQube project key: ${env.SONAR_PROJECT_KEY}"
         }
         failure {
-            echo 'Pipeline failed — check console output / SonarQube / Docker logs.'
+            echo 'Pipeline failed — check Console Output (often Sonar token/project key mismatch).'
             bat 'docker logs %CONTAINER_NAME% 2>NUL || exit /b 0'
-        }
-        unstable {
-            echo 'Pipeline finished with UNSTABLE Sonar/Quality Gate, but deploy stages continued.'
         }
     }
 }
