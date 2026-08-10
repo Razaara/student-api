@@ -50,9 +50,11 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                // Requires successful analysis (report-task.txt). Prefer Sonar webhook to Jenkins.
-                timeout(time: 10, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: false
+                // Without Sonar webhook, this can hang on PENDING — don't abort the whole pipeline
+                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                    timeout(time: 2, unit: 'MINUTES') {
+                        waitForQualityGate abortPipeline: false
+                    }
                 }
             }
         }
